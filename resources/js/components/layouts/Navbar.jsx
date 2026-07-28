@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, User, LogOut, Shield } from 'lucide-react';
+import { Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 import Logo from '@/assets/savecatlogo.png';
@@ -227,16 +227,15 @@ export default function Navbar() {
                                                 </div>
 
                                                 <div className="py-1">
-                                                    {userData?.is_admin && (
-                                                        <Link
-                                                            to="/admin"
-                                                            className="flex items-center px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 transition-colors font-semibold border-b border-gray-100"
-                                                            onClick={() => setShowProfileMenu(false)}
-                                                        >
-                                                            <Shield className="w-4 h-4 mr-3 text-emerald-500" />
-                                                            Dashboard Admin
-                                                        </Link>
-                                                    )}
+                                                    {/* PERBAIKAN: Dashboard bisa diakses semua user yang login */}
+                                                    <Link
+                                                        to="/dashboard"
+                                                        className="flex items-center px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 transition-colors font-semibold border-b border-gray-100"
+                                                        onClick={() => setShowProfileMenu(false)}
+                                                    >
+                                                        <LayoutDashboard className="w-4 h-4 mr-3 text-emerald-500" />
+                                                        Dashboard Saya
+                                                    </Link>
 
                                                     <Link
                                                         to="/profile"
@@ -319,14 +318,15 @@ export default function Navbar() {
                                             </div>
                                         </div>
                                     </Link>
-                                    {userData?.is_admin && (
-                                        <Link to="/admin" className="block w-full" onClick={() => setIsMobileMenuOpen(false)}>
-                                            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer flex items-center justify-center gap-2">
-                                                <Shield className="w-4 h-4" />
-                                                Dashboard Admin
-                                            </Button>
-                                        </Link>
-                                    )}
+                                    
+                                    {/* PERBAIKAN: Dashboard bisa diakses semua user yang login di mobile */}
+                                    <Link to="/dashboard" className="block w-full" onClick={() => setIsMobileMenuOpen(false)}>
+                                        <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer flex items-center justify-center gap-2">
+                                            <LayoutDashboard className="w-4 h-4" />
+                                            Dashboard Saya
+                                        </Button>
+                                    </Link>
+
                                     <Link to="/report/create" className="block w-full" onClick={() => setIsMobileMenuOpen(false)}>
                                         <Button className="w-full bg-blue-600 hover:bg-blue-700 text-gray-200 cursor-pointer">
                                             + Buat Laporan

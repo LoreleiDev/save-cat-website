@@ -7,7 +7,7 @@ use App\Http\Controllers\ForgotPasswordController;
 
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\CommentController;
-use App\Http\Controllers\AdminController;
+use App\Http\Controllers\DashboardController;
 
 // Public routes (tidak perlu token)
 Route::post('/register', [RegisterController::class, 'register']);
@@ -34,14 +34,17 @@ Route::middleware('auth.user_token')->group(function () {
     Route::post('/reports', [ReportController::class, 'store']);
     Route::post('/reports/{id}/comments', [CommentController::class, 'store']);
 
-    // Admin dashboard routes (checks is_admin inside controller)
-    Route::get('/admin/overview', [AdminController::class, 'overview']);
-    Route::get('/admin/users', [AdminController::class, 'users']);
-    Route::get('/admin/users/{id}', [AdminController::class, 'userDetails']);
-    Route::post('/admin/users/{id}/logout', [AdminController::class, 'forceLogout']);
-    Route::get('/admin/reports', [AdminController::class, 'reports']);
-    Route::post('/admin/reports/{id}/status', [AdminController::class, 'toggleReportStatus']);
-    Route::delete('/admin/reports/{id}', [AdminController::class, 'deleteReport']);
-    Route::get('/admin/comments', [AdminController::class, 'comments']);
-    Route::delete('/admin/comments/{id}', [AdminController::class, 'deleteComment']);
+    Route::prefix('dashboard')->group(function () {
+        Route::get('/overview', [DashboardController::class, 'overview']);
+        Route::get('/users', [DashboardController::class, 'users']);
+        Route::get('/users/{id}', [DashboardController::class, 'userDetails']);
+        Route::post('/users/{id}/force-logout', [DashboardController::class, 'forceLogout']);
+        
+        Route::get('/reports', [DashboardController::class, 'reports']);
+        Route::post('/reports/{id}/toggle', [DashboardController::class, 'toggleReportStatus']);
+        Route::delete('/reports/{id}', [DashboardController::class, 'deleteReport']);
+        
+        Route::get('/comments', [DashboardController::class, 'comments']);
+        Route::delete('/comments/{id}', [DashboardController::class, 'deleteComment']);
+    });
 });

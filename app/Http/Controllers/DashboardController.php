@@ -7,20 +7,17 @@ use App\Models\Report;
 use App\Models\Comment;
 use Illuminate\Http\Request;
 
-class AdminController extends Controller
+class DashboardController extends Controller
 {
-    private function checkAdmin(Request $request)
+    private function isAdmin(Request $request)
     {
         $user = $request->user();
-        if (!$user || !$user->is_admin) {
-            return false;
-        }
-        return true;
+        return $user && $user->is_admin;
     }
 
     public function overview(Request $request)
     {
-        if (!$this->checkAdmin($request)) {
+        if (!$this->isAdmin($request)) {
             return response()->json(['message' => 'Akses ditolak. Khusus Admin.'], 403);
         }
 
@@ -29,12 +26,10 @@ class AdminController extends Controller
         $totalReports = Report::count();
         $totalComments = Comment::count();
 
-        // Build recent activities dynamically
         $recentReports = Report::with('user')->orderBy('created_at', 'desc')->limit(5)->get();
         $recentComments = Comment::with(['user', 'report'])->orderBy('created_at', 'desc')->limit(5)->get();
 
         $activities = [];
-
         foreach ($recentReports as $r) {
             $activities[] = [
                 'id' => 'report_' . $r->id,
@@ -45,7 +40,6 @@ class AdminController extends Controller
                 'detail' => $r->location,
             ];
         }
-
         foreach ($recentComments as $c) {
             $activities[] = [
                 'id' => 'comment_' . $c->id,
@@ -57,13 +51,9 @@ class AdminController extends Controller
             ];
         }
 
-        // Sort combined activities by time desc
         usort($activities, function($a, $b) {
             return strcmp($b['time'], $a['time']);
         });
-
-        // Limit to 6
-        $activities = array_slice($activities, 0, 6);
 
         return response()->json([
             'stats' => [
@@ -72,18 +62,17 @@ class AdminController extends Controller
                 'total_reports' => $totalReports,
                 'total_comments' => $totalComments,
             ],
-            'activities' => $activities,
+            'activities' => array_slice($activities, 0, 6),
         ]);
     }
 
     public function users(Request $request)
     {
-        if (!$this->checkAdmin($request)) {
+        if (!$this->isAdmin($request)) {
             return response()->json(['message' => 'Akses ditolak. Khusus Admin.'], 403);
         }
 
         $users = User::withCount(['reports', 'comments'])->get();
-
         return response()->json($users->map(function($u) {
             return [
                 'id' => $u->id,
@@ -98,94 +87,47 @@ class AdminController extends Controller
         }));
     }
 
-    public function userDetails(Request $request, $id)
-    {
-        if (!$this->checkAdmin($request)) {
-            return response()->json(['message' => 'Akses ditolak. Khusus Admin.'], 403);
-        }
-
-        $user = User::with(['reports', 'comments.report'])->find($id);
-
-        if (!$user) {
-            return response()->json(['message' => 'User tidak ditemukan'], 404);
-        }
-
-        return response()->json([
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'telp' => $user->telp,
-            'joined_date' => $user->created_at->toDateString(),
-            'reports' => $user->reports->map(function($r) {
-                return [
-                    'id' => $r->id,
-                    'title' => $r->title,
-                    'status' => $r->status,
-                    'location' => $r->location,
-                    'createdAt' => $r->created_at->toIso8601String(),
-                ];
-            }),
-            'comments' => $user->comments->map(function($c) {
-                return [
-                    'id' => $c->id,
-                    'comment_text' => $c->comment_text,
-                    'report_title' => $c->report->title ?? 'Laporan dihapus',
-                    'createdAt' => $c->created_at->toIso8601String(),
-                ];
-            }),
-        ]);
-    }
-
-    public function forceLogout(Request $request, $id)
-    {
-        if (!$this->checkAdmin($request)) {
-            return response()->json(['message' => 'Akses ditolak. Khusus Admin.'], 403);
-        }
-
-        $user = User::find($id);
-        if (!$user) {
-            return response()->json(['message' => 'User tidak ditemukan'], 404);
-        }
-
-        $user->user_token = null;
-        $user->save();
-
-        return response()->json(['message' => "Sesi user {$user->name} berhasil diputus"]);
-    }
-
+    // PERUBAHAN PENTING: Semua user (termasuk admin) hanya lihat laporan MILIK SENDIRI
     public function reports(Request $request)
     {
-        if (!$this->checkAdmin($request)) {
-            return response()->json(['message' => 'Akses ditolak. Khusus Admin.'], 403);
-        }
+        $user = $request->user();
 
-        $reports = Report::with(['user', 'comments'])->get();
+        $query = Report::with(['user', 'comments']);
+        
+        // Filter berdasarkan user_id untuk SEMUA user
+        $query->where('user_id', $user->id);
 
+        $reports = $query->orderBy('created_at', 'desc')->get();
+        
         return response()->json($reports->map(function($r) {
             return [
                 'id' => $r->id,
+                'user_id' => $r->user_id,
                 'title' => $r->title,
                 'category' => $r->category,
                 'urgency' => $r->urgency,
                 'status' => $r->status,
                 'location' => $r->location,
-                'description' => $r->description,
+                'content' => $r->description,
                 'reporter_name' => $r->user->name ?? 'Anonim',
                 'comments_count' => $r->comments->count(),
-                'createdAt' => $r->created_at->toIso8601String(),
+                'created_at' => $r->created_at->toIso8601String(),
             ];
         }));
     }
 
     public function toggleReportStatus(Request $request, $id)
     {
-        if (!$this->checkAdmin($request)) {
-            return response()->json(['message' => 'Akses ditolak. Khusus Admin.'], 403);
-        }
-
+        $user = $request->user();
         $report = Report::find($id);
+
         if (!$report) {
             return response()->json(['message' => 'Laporan tidak ditemukan'], 404);
+        }
+
+        // Validasi: Hanya pemilik laporan yang bisa mengubah status
+        if ($report->user_id !== $user->id) {
+            return response()->json(['message' => 'Akses ditolak. Anda hanya bisa mengelola laporan sendiri.'], 403);
         }
 
         $report->status = ($report->status === 'aktif') ? 'selesai' : 'aktif';
@@ -199,52 +141,61 @@ class AdminController extends Controller
 
     public function deleteReport(Request $request, $id)
     {
-        if (!$this->checkAdmin($request)) {
-            return response()->json(['message' => 'Akses ditolak. Khusus Admin.'], 403);
-        }
-
+        $user = $request->user();
         $report = Report::find($id);
+
         if (!$report) {
             return response()->json(['message' => 'Laporan tidak ditemukan'], 404);
         }
 
-        $report->delete();
+        // Validasi: Hanya pemilik laporan yang bisa menghapus
+        if ($report->user_id !== $user->id) {
+            return response()->json(['message' => 'Akses ditolak. Anda hanya bisa menghapus laporan sendiri.'], 403);
+        }
 
+        $report->delete();
         return response()->json(['message' => 'Laporan berhasil dihapus']);
     }
 
+    // PERUBAHAN PENTING: Semua user (termasuk admin) hanya lihat komentar MILIK SENDIRI
     public function comments(Request $request)
     {
-        if (!$this->checkAdmin($request)) {
-            return response()->json(['message' => 'Akses ditolak. Khusus Admin.'], 403);
-        }
+        $user = $request->user();
 
-        $comments = Comment::with(['user', 'report'])->get();
+        $query = Comment::with(['user', 'report']);
+        
+        // Filter berdasarkan user_id untuk SEMUA user
+        $query->where('user_id', $user->id);
+
+        $comments = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json($comments->map(function($c) {
             return [
                 'id' => $c->id,
+                'user_id' => $c->user_id,
                 'user_name' => $c->user->name ?? 'Anonim',
-                'report_title' => $c->report->title ?? 'Laporan dihapus',
-                'comment_text' => $c->comment_text,
-                'createdAt' => $c->created_at->toIso8601String(),
+                'post_title' => $c->report->title ?? 'Laporan dihapus',
+                'content' => $c->comment_text,
+                'created_at' => $c->created_at->toIso8601String(),
             ];
         }));
     }
 
     public function deleteComment(Request $request, $id)
     {
-        if (!$this->checkAdmin($request)) {
-            return response()->json(['message' => 'Akses ditolak. Khusus Admin.'], 403);
-        }
-
+        $user = $request->user();
         $comment = Comment::find($id);
+
         if (!$comment) {
             return response()->json(['message' => 'Komentar tidak ditemukan'], 404);
         }
 
-        $comment->delete();
+        // Validasi: Hanya pemilik komentar yang bisa menghapus
+        if ($comment->user_id !== $user->id) {
+            return response()->json(['message' => 'Akses ditolak. Anda hanya bisa menghapus komentar sendiri.'], 403);
+        }
 
+        $comment->delete();
         return response()->json(['message' => 'Komentar berhasil dihapus']);
     }
 }
