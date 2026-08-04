@@ -15,6 +15,7 @@ class User extends Authenticatable
         'email',
         'password',
         'telp',
+        'avatar',
         'is_admin',
         'verification_code',
         'verification_code_expires_at',

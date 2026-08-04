@@ -24,15 +24,40 @@ export default function Navbar() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Cek status login dari localStorage
+    // Cek status login dan fetch data profil terbaru (termasuk avatar)
     useEffect(() => {
-        const checkLoginStatus = () => {
+        const checkLoginStatus = async () => {
             const token = localStorage.getItem('user_token');
-            const user = localStorage.getItem('user');
+            const storedUserStr = localStorage.getItem('user');
 
-            if (token && user) {
+            if (token) {
                 setIsLoggedIn(true);
-                setUserData(JSON.parse(user));
+                
+                // Tampilkan data dari localStorage dulu agar render cepat (tidak blank)
+                if (storedUserStr) {
+                    setUserData(JSON.parse(storedUserStr));
+                }
+
+                // Fetch data terbaru dari API untuk memastikan avatar & data lain up-to-date
+                try {
+                    const res = await fetch('/api/profile', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/json',
+                        }
+                    });
+                    if (res.ok) {
+                        const apiData = await res.json();
+                        const updatedUser = { 
+                            ...(storedUserStr ? JSON.parse(storedUserStr) : {}), 
+                            ...apiData 
+                        };
+                        setUserData(updatedUser);
+                        localStorage.setItem('user', JSON.stringify(updatedUser));
+                    }
+                } catch (error) {
+                    console.error('Gagal mengambil data profil:', error);
+                }
             } else {
                 setIsLoggedIn(false);
                 setUserData(null);
@@ -102,12 +127,27 @@ export default function Navbar() {
     };
 
     const getInitials = (name) => {
+        if (!name) return 'U';
         return name
             .split(' ')
             .map(word => word[0])
             .join('')
             .toUpperCase()
             .slice(0, 2);
+    };
+
+    // Fungsi helper untuk render Avatar (Gambar atau Inisial)
+    const renderAvatar = () => {
+        if (userData?.avatar) {
+            return (
+                <img 
+                    src={userData.avatar} 
+                    alt="Avatar" 
+                    className="w-full h-full object-cover" 
+                />
+            );
+        }
+        return userData ? getInitials(userData.name) : 'U';
     };
 
     // Fungsi khusus untuk menangani klik pada link navigasi
@@ -208,8 +248,9 @@ export default function Navbar() {
                                         onClick={() => setShowProfileMenu(!showProfileMenu)}
                                         className="flex items-center space-x-2 cursor-pointer group"
                                     >
-                                        <div className="w-10 h-10 rounded-full bg-linear-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white/20 group-hover:ring-white/40 transition-all">
-                                            {userData ? getInitials(userData.name) : 'U'}
+                                        {/* PERBAIKAN: Render Avatar atau Inisial dengan overflow-hidden */}
+                                        <div className="w-10 h-10 rounded-full bg-linear-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white/20 group-hover:ring-white/40 transition-all overflow-hidden">
+                                            {renderAvatar()}
                                         </div>
                                     </button>
 
@@ -227,7 +268,6 @@ export default function Navbar() {
                                                 </div>
 
                                                 <div className="py-1">
-                                                    {/* PERBAIKAN: Dashboard bisa diakses semua user yang login */}
                                                     <Link
                                                         to="/dashboard"
                                                         className="flex items-center px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 transition-colors font-semibold border-b border-gray-100"
@@ -309,8 +349,9 @@ export default function Navbar() {
                                 <>
                                     <Link to="/profile" className="block w-full" onClick={() => setIsMobileMenuOpen(false)}>
                                         <div className="flex items-center space-x-3 px-4 py-3 bg-white/10 rounded-lg">
-                                            <div className="w-10 h-10 rounded-full bg-linear-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white font-bold text-sm">
-                                                {userData ? getInitials(userData.name) : 'U'}
+                                            {/* PERBAIKAN: Render Avatar atau Inisial di Mobile */}
+                                            <div className="w-10 h-10 rounded-full bg-linear-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white font-bold text-sm overflow-hidden">
+                                                {renderAvatar()}
                                             </div>
                                             <div className="flex-1 text-left">
                                                 <p className="text-white font-semibold text-sm">{userData?.name}</p>
@@ -319,7 +360,6 @@ export default function Navbar() {
                                         </div>
                                     </Link>
                                     
-                                    {/* PERBAIKAN: Dashboard bisa diakses semua user yang login di mobile */}
                                     <Link to="/dashboard" className="block w-full" onClick={() => setIsMobileMenuOpen(false)}>
                                         <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer flex items-center justify-center gap-2">
                                             <LayoutDashboard className="w-4 h-4" />

@@ -138,7 +138,7 @@ export default function useCreateReport() {
                     text: 'Laporan Anda sudah diterima. Tim komunitas akan segera merespons.',
                     confirmButtonColor: '#10b981', confirmButtonText: 'Lihat Laporan',
                 });
-                navigate(`/reports/${data.id ?? ''}`);
+                navigate(`/dashboard`);
             } else {
                 const data = await res.json();
                 throw new Error(data.message || 'Gagal mengirim laporan.');

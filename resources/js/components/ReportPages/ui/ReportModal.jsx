@@ -52,7 +52,7 @@ export default function ReportModal({ report, onClose }) {
 
             if (res.ok) {
                 setCommentText('');
-                fetchDetails();
+                fetchDetails(); // Refresh data untuk menampilkan komentar baru + avatar
             } else {
                 const errData = await res.json();
                 Swal.fire({ icon: 'error', title: 'Gagal', text: errData.message || 'Gagal mengirim komentar.', confirmButtonColor: '#0d9488' });
@@ -73,6 +73,30 @@ export default function ReportModal({ report, onClose }) {
             window.removeEventListener('keydown', handleKey);
         };
     }, [onClose]);
+
+    // ✅ FUNGSI HELPER UNTUK RENDER AVATAR ATAU INISIAL
+    const getInitials = (name) => {
+        if (!name) return 'A';
+        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    };
+
+    const renderAvatar = (name, avatarUrl) => {
+        if (avatarUrl && avatarUrl !== 'null' && avatarUrl !== 'undefined') {
+            return (
+                <img 
+                    src={avatarUrl} 
+                    alt={name} 
+                    className="w-full h-full object-cover" 
+                    onError={(e) => {
+                        // Fallback ke inisial jika link gambar rusak
+                        e.target.style.display = 'none';
+                        e.target.parentElement.innerText = getInitials(name);
+                    }}
+                />
+            );
+        }
+        return getInitials(name);
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -123,8 +147,9 @@ export default function ReportModal({ report, onClose }) {
 
                     <div className="flex items-center justify-between p-4 rounded-xl bg-teal-50 border border-teal-100">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-linear-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-white font-bold text-sm shadow">
-                                {report.reporter ? report.reporter.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'A'}
+                            {/* ✅ RENDER AVATAR PELAPOR */}
+                            <div className="w-10 h-10 rounded-full bg-linear-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-white font-bold text-sm shadow overflow-hidden">
+                                {renderAvatar(report.reporter, fullReport?.reporter_avatar)}
                             </div>
                             <div>
                                 <p className="text-sm font-semibold text-gray-900">{report.reporter}</p>
@@ -149,17 +174,23 @@ export default function ReportModal({ report, onClose }) {
                             </div>
                         ) : (
                             <>
-                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                                     {fullReport?.comments?.length === 0 ? (
                                         <p className="text-gray-400 text-xs italic text-center py-4">Belum ada diskusi. Tulis tanggapan atau kesediaanmu membantu!</p>
                                     ) : (
                                         fullReport?.comments?.map((c) => (
-                                            <div key={c.id} className="bg-gray-50 rounded-xl p-3 border border-gray-100/50 space-y-1">
-                                                <div className="flex items-center justify-between text-xs">
-                                                    <span className="font-semibold text-teal-800">{c.name}</span>
-                                                    <span className="text-gray-400 text-[10px]">{timeAgo(c.createdAt)}</span>
+                                            <div key={c.id} className="flex items-start gap-3">
+                                                {/* ✅ RENDER AVATAR KOMENTATOR */}
+                                                <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-xs shrink-0 overflow-hidden mt-0.5">
+                                                    {renderAvatar(c.name, c.avatar)}
                                                 </div>
-                                                <p className="text-gray-700 text-xs leading-relaxed">{c.comment_text}</p>
+                                                <div className="flex-1 bg-gray-50 rounded-xl p-3 border border-gray-100/50 space-y-1">
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="font-semibold text-teal-800">{c.name}</span>
+                                                        <span className="text-gray-400 text-[10px]">{timeAgo(c.createdAt)}</span>
+                                                    </div>
+                                                    <p className="text-gray-700 text-xs leading-relaxed">{c.comment_text}</p>
+                                                </div>
                                             </div>
                                         ))
                                     )}

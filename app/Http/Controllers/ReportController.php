@@ -10,47 +10,37 @@ use Cloudinary\Cloudinary as CloudinarySDK;
 
 class ReportController extends Controller
 {
-    /**
-     * Initialize Cloudinary instance dari .env (Khusus untuk Upload/Delete)
-     */
     private function getCloudinary()
     {
         return new CloudinarySDK(env('CLOUDINARY_URL'));
     }
 
-    /**
-     * Generate URL gambar HD dengan optimasi otomatis (Manual String Builder)
-     */
     private function getOptimizedUrl($publicId)
     {
-        if (!$publicId) {
-            return 'https://placehold.co/1280x720/0d9488/ffffff?text=🐱';
-        }
-
-        if (str_starts_with($publicId, 'http://') || str_starts_with($publicId, 'https://')) {
-            return $publicId;
-        }
-
+        if (!$publicId) return 'https://placehold.co/1280x720/0d9488/ffffff?text=🐱';
+        if (str_starts_with($publicId, 'http://') || str_starts_with($publicId, 'https://')) return $publicId;
+        
         $cloudName = env('CLOUDINARY_CLOUD_NAME');
-        // q = quality, f = format, w = width, c = crop
         return "https://res.cloudinary.com/{$cloudName}/image/upload/q_auto:good,f_auto,w_1280,c_limit/{$publicId}";
     }
 
-    /**
-     * Generate URL thumbnail kecil untuk card list (Manual String Builder)
-     */
     private function getThumbnailUrl($publicId)
     {
-        if (!$publicId) {
-            return 'https://placehold.co/400x300/0d9488/ffffff?text=🐱';
-        }
-
-        if (str_starts_with($publicId, 'http://') || str_starts_with($publicId, 'https://')) {
-            return $publicId;
-        }
-
+        if (!$publicId) return 'https://placehold.co/400x300/0d9488/ffffff?text=🐱';
+        if (str_starts_with($publicId, 'http://') || str_starts_with($publicId, 'https://')) return $publicId;
+        
         $cloudName = env('CLOUDINARY_CLOUD_NAME');
         return "https://res.cloudinary.com/{$cloudName}/image/upload/q_auto:eco,f_auto,w_600,h_400,c_fill/{$publicId}";
+    }
+
+    // ✅ HELPER BARU UNTUK AVATAR
+    private function getAvatarUrl($publicId)
+    {
+        if (!$publicId || str_starts_with($publicId, 'http://') || str_starts_with($publicId, 'https://')) {
+            return $publicId;
+        }
+        $cloudName = env('CLOUDINARY_CLOUD_NAME');
+        return "https://res.cloudinary.com/{$cloudName}/image/upload/q_auto:good,f_auto,w_100,h_100,c_fill/{$publicId}";
     }
 
     public function index(Request $request)
@@ -78,18 +68,11 @@ class ReportController extends Controller
         }
 
         $sortBy = $request->input('sortBy', 'terbaru');
-        if ($sortBy === 'terbaru') {
-            $query->orderBy('created_at', 'desc');
-        } elseif ($sortBy === 'terlama') {
-            $query->orderBy('created_at', 'asc');
-        } elseif ($sortBy === 'komentar') {
-            $query->withCount('comments')->orderBy('comments_count', 'desc');
-        } elseif ($sortBy === 'urgensi') {
-            $query->orderByRaw("CASE urgency 
-                WHEN 'tinggi' THEN 1 
-                WHEN 'sedang' THEN 2 
-                WHEN 'rendah' THEN 3 
-                ELSE 4 END ASC");
+        if ($sortBy === 'terbaru') $query->orderBy('created_at', 'desc');
+        elseif ($sortBy === 'terlama') $query->orderBy('created_at', 'asc');
+        elseif ($sortBy === 'komentar') $query->withCount('comments')->orderBy('comments_count', 'desc');
+        elseif ($sortBy === 'urgensi') {
+            $query->orderByRaw("CASE urgency WHEN 'tinggi' THEN 1 WHEN 'sedang' THEN 2 WHEN 'rendah' THEN 3 ELSE 4 END ASC");
         }
 
         $perPage = $request->input('per_page', 8);
@@ -152,6 +135,7 @@ class ReportController extends Controller
             'location' => $report->location,
             'description' => $report->description,
             'reporter' => $report->user->name ?? 'Anonim',
+            'reporter_avatar' => $this->getAvatarUrl($report->user->avatar ?? null), // ✅ TAMBAHAN
             'contact' => $report->contact,
             'comments_count' => $report->comments->count(),
             'createdAt' => $report->created_at->toIso8601String(),
@@ -164,6 +148,7 @@ class ReportController extends Controller
                     'id' => $c->id,
                     'user_id' => $c->user_id,
                     'name' => $c->user->name ?? 'Anonim',
+                    'avatar' => $this->getAvatarUrl($c->user->avatar ?? null), // ✅ TAMBAHAN
                     'comment_text' => $c->comment_text,
                     'createdAt' => $c->created_at->toIso8601String(),
                 ];
@@ -209,7 +194,6 @@ class ReportController extends Controller
 
         if ($request->hasFile('images')) {
             $cloudinary = $this->getCloudinary();
-            
             foreach ($request->file('images') as $file) {
                 $uploaded = $cloudinary->uploadApi()->upload($file->getRealPath(), [
                     'folder' => 'savecat/reports',

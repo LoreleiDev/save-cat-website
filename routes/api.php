@@ -1,13 +1,13 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\LoginController;
-use App\Http\Controllers\RegisterController;
-use App\Http\Controllers\ForgotPasswordController;
-
-use App\Http\Controllers\ReportController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ForgotPasswordController;
+use App\Http\Controllers\LoginController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RegisterController;
+use App\Http\Controllers\ReportController;
+use Illuminate\Support\Facades\Route;
 
 // Public routes (tidak perlu token)
 Route::post('/register', [RegisterController::class, 'register']);
@@ -34,6 +34,11 @@ Route::middleware('auth.user_token')->group(function () {
     Route::post('/reports', [ReportController::class, 'store']);
     Route::post('/reports/{id}/comments', [CommentController::class, 'store']);
 
+    // Profile routes
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::post('/profile', [ProfileController::class, 'update']);
+
+    // Dashboard routes 
     Route::prefix('dashboard')->group(function () {
         Route::get('/overview', [DashboardController::class, 'overview']);
         Route::get('/users', [DashboardController::class, 'users']);
